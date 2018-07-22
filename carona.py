@@ -4,8 +4,8 @@ from time import sleep
 from tkinter import *
 from tkinter import messagebox
 
-from selenium import common
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -49,61 +49,93 @@ def postar_no_whatsapp(grupos, mensagem):
 
 
 def postar_no_facebook(email, senha, grupos, mensagem):
-    global sucesso_fb
-    print('Postando no Facebook')
-    profile = webdriver.FirefoxProfile()
-    profile.set_preference("browser.cache.disk.enable", False)
-    profile.set_preference("browser.cache.memory.enable", False)
-    profile.set_preference("browser.cache.offline.enable", False)
-    profile.set_preference("network.http.use-cache", False)
-    profile.set_preference("dom.webnotifications.enabled", False)
+    # Criar instância do navegador
+    driver = webdriver.Firefox()
 
-    options = Options()
-    options.add_argument("--headless")
+    # Minimiza a janela do navegador.
+    driver.minimize_window()
 
-    driver = webdriver.Firefox(firefox_options=options,
-                               executable_path=os.path.join(path[0], 'geckodriver.exe'))
-    driver.implicitly_wait(15)
+    # Acessa a página de login do Facebook
+    driver.get("https://mbasic.facebook.com")
 
-    driver.get("http://www.facebook.com")
-    elem = driver.find_element_by_id("email")
-    elem.send_keys(email)
-    elem = driver.find_element_by_id("pass")
-    elem.send_keys(senha)
-    elem.send_keys(Keys.RETURN)
-    sleep(15)
+    # Encontrar elemento do campo de e-mail pelo atributo
+    email_field = driver.find_element_by_name("email")
 
-    for group in grupos:
-        driver.get(group)
+    # Digita o e-mail no campo de e-mail pelo atributo
+    email_field.send_keys(email)
 
-        sleep(10)
+    # Encontrar elemento do campo de senha pelo atributo
+    senha_field = driver.find_element_by_name("pass")
+
+    # Digita a senha no campo de senha pelo atributo
+    senha_field.send_keys(senha)
+
+    # Simular que o enter seja precisonado
+    driver.find_element_by_name("pass").send_keys(Keys.ENTER)
+
+    # Espera 5 segundos
+    sleep(5)
+
+    # Verifica se fez login no Facebook
+    try:
+        driver.find_element(By.XPATH, "//input[@value='OK']").click()
+    except NoSuchElementException:
+        messagebox.showerror('Algo deu errado!',
+                             "Não foi possível logar no Facebook, tente novamente.")
+        driver.close()
+        return
+
+    # Espera 5 segundos
+    sleep(5)
+
+    for grupo in grupos:
+        # Acessa o grupo do Facebook
+        driver.get(grupo)
+
+        # Espera a pagina ser carregada se a internet estiver lenta
+        driver.set_page_load_timeout(60 * 50)
+
+        # Pega o nome do Grupo do Facebook que está acessando.
+        nome_grupo = driver.title
+
+        # Informa qual grupo foi acessado
+        print('\n')
+        print('Acessando grupo: "{}"'.format(nome_grupo))
         try:
-            post_box = driver.find_element_by_xpath("//*[@name='xhpc_message_text']")
-        except common.exceptions.NoSuchElementException:
-            messagebox.showerror('Algo deu errado!',
-                                 "Não foi possível logar no Facebook, tente novamente.")
-            driver.close()
-            return
+            # Encontrar elemento do campo de postagem pelo atributo
+            caixa_mensagem = driver.find_element_by_name("xc_message")
 
-        post_box.send_keys(mensagem)
-        sleep(10)
+            # Digita a mensagem no campo de postagem pelo atributo
+            caixa_mensagem.send_keys(mensagem)
 
-        try:
-            post_button = driver.find_element_by_xpath(
-                "//*[@data-testid='react-composer-post-button']")
-            post_button.click()
-            sleep(5)
-        except Exception:
-            ActionChains(driver) \
-                .key_down(Keys.CONTROL) \
-                .send_keys(Keys.RETURN) \
-                .key_up(Keys.CONTROL) \
-                .perform()
+            # Informa que está sendo postado a mensagem
+            print('Adicionando mensagem à caixa')
+
+            # Espera a pagina ser carregada se a internet estiver lenta
+            driver.set_page_load_timeout(60 * 50)
+
+            try:
+                # Encontrar elemento do campo de publicar pelo atributo
+                driver.find_element_by_name("view_post").click()
+            except NoSuchElementException:
+                ActionChains(driver) \
+                    .key_down(Keys.CONTROL) \
+                    .send_keys(Keys.RETURN) \
+                    .key_up(Keys.CONTROL) \
+                    .perform()
+
+            # Informa que foi finalizado no grupo que está sendo postado
+            print('Postagem realizada com sucesso.')
+
+        except NoSuchElementException as e:
+            print('Não foi possível postar no grupo.')
+            print(e)
+
+        # Espera 5 segundos
         sleep(5)
 
-    driver.close()
-    sucesso_fb = True
-    return
+    # Fechar navegador
+    driver.quit()
 
 
 def carona_handler():
@@ -146,64 +178,68 @@ def carona_handler():
     # Muriaé >> Ouro Preto
     if origem_var.get() == 'Muriaé' and destino_var.get() == 'Ouro Preto':
         print('Muriaé >> Ouro Preto')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/314296848663622/',
-                     'https://www.facebook.com/groups/1487504921462576/',
-                     'https://www.facebook.com/groups/1671840656410743/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/314296848663622/',
+                     'https://mbasic.facebook.com/groups/1487504921462576/',
+                     'https://mbasic.facebook.com/groups/1671840656410743/']
         grupos_wp = ['Carona: 🚗BH<>🚘<>Muriaé🚕', ]
 
     # Ouro Preto >> Muriaé
     elif origem_var.get() == 'Ouro Preto' and destino_var.get() == 'Muriaé':
         print('Ouro Preto >> Muriaé')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/314296848663622/',
-                     'https://www.facebook.com/groups/1487504921462576/',
-                     'https://www.facebook.com/groups/1671840656410743/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/314296848663622/',
+                     'https://mbasic.facebook.com/groups/1487504921462576/',
+                     'https://mbasic.facebook.com/groups/1671840656410743/']
         grupos_wp = ['Carona: 🚗BH<>🚘<>Muriaé🚕', ]
 
     # Ouro Preto >> Viçosa
     elif origem_var.get() == 'Ouro Preto' and destino_var.get() == 'Viçosa':
         print('Ouro Preto >> Viçosa')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/148666088555002/',
-                     'https://www.facebook.com/groups/178889795534679/',
-                     'https://www.facebook.com/groups/233530423442784/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/148666088555002/',
+                     'https://mbasic.facebook.com/groups/178889795534679/',
+                     'https://mbasic.facebook.com/groups/233530423442784/']
         grupos_wp = ['Viçosa 《=》 BHte 🚙🤝💰', 'Carona Viçosa-OP-Viçosa🚕']
 
     # Viçosa >> Ouro Preto
     elif origem_var.get() == 'Viçosa' and destino_var.get() == 'Ouro Preto':
         print('Viçosa >> Ouro Preto')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/148666088555002/',
-                     'https://www.facebook.com/groups/178889795534679/',
-                     'https://www.facebook.com/groups/233530423442784/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/148666088555002/',
+                     'https://mbasic.facebook.com/groups/178889795534679/',
+                     'https://mbasic.facebook.com/groups/233530423442784/']
         grupos_wp = ['Viçosa 《=》 BHte 🚙🤝💰', 'Carona Viçosa-OP-Viçosa🚕']
 
     # Viçosa >> Muriaé
     elif origem_var.get() == 'Viçosa' and destino_var.get() == 'Muriaé':
         print('Viçosa >> Muriaé')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/750505538437249',
-                     'https://www.facebook.com/groups/289535414451046/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/750505538437249',
+                     'https://mbasic.facebook.com/groups/289535414451046/']
         grupos_wp = []
 
     # Muriaé >> Viçosa
     elif origem_var.get() == 'Muriaé' and destino_var.get() == 'Viçosa':
         print('Muriaé >> Viçosa')
-        grupos_fb = ['https://www.facebook.com/groups/197987093613087/',
-                     'https://www.facebook.com/groups/750505538437249',
-                     'https://www.facebook.com/groups/289535414451046/']
+        grupos_fb = ['https://mbasic.facebook.com/groups/197987093613087/',
+                     'https://mbasic.facebook.com/groups/750505538437249',
+                     'https://mbasic.facebook.com/groups/289535414451046/']
         grupos_wp = []
 
     # Teste >> Teste
     elif origem_var.get() == 'Teste' and destino_var.get() == 'Teste':
         print('Teste')
+        grupos_fb = ['https://mbasic.facebook.com/groups/1973005072714372/']
+        grupos_wp = []
 
     desabilitar_elementos()
+
     if grupos_fb and postagem_fb_var.get():
         postar_no_facebook(email_str, senha_str, grupos_fb, mensagem)
     if grupos_wp and postagem_wp_var.get():
         postar_no_whatsapp(grupos_wp, mensagem)
+
     habilitar_elementos()
 
     if postagem_fb_var.get() and sucesso_fb and sucesso_wp and postagem_wp_var.get():
